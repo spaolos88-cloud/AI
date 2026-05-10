@@ -38,7 +38,7 @@ async function readRunReply(
   client: OpenAI,
   threadId: string,
   runId: string,
-  retries = 5,
+  retries = 10,
 ) {
   for (let attempt = 0; attempt < retries; attempt += 1) {
     const threadMessages = await client.beta.threads.messages.list(threadId, {
@@ -61,8 +61,21 @@ async function readRunReply(
       }
     }
 
+    const latestAssistantMessage = threadMessages.data.find(
+      (message) =>
+        message.role === "assistant" && Array.isArray(message.content),
+    );
+
+    if (latestAssistantMessage) {
+      const text = extractAssistantText(latestAssistantMessage.content);
+
+      if (text) {
+        return text;
+      }
+    }
+
     if (attempt < retries - 1) {
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 800));
     }
   }
 
