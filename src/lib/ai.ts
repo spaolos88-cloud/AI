@@ -8,6 +8,14 @@ type ConversationState = {
 };
 
 const conversationStates = new Map<string, ConversationState>();
+const conversationQueues = new Map<string, Promise<string>>();
+
+const activeRunStatuses = new Set([
+  "queued",
+  "in_progress",
+  "requires_action",
+  "cancelling",
+]);
 
 function getUserMessages(messages: ChatMessage[]) {
   return messages.filter((message) => message.role === "user");
@@ -82,7 +90,32 @@ async function readRunReply(
   throw new Error("Assistant run completed without a reply message.");
 }
 
-export async function generateAssistantReply(
+async function waitForThreadToBeIdle(client: OpenAI, threadId: string) {
+  const runs = await client.beta.threads.runs.list(threadId, {
+    order: "desc",
+    limit: 10,
+  });
+
+  const activeRun = runs.data.find((run) => activeRunStatuses.has(run.status));
+
+  if (!activeRun) {
+    return;
+  }
+
+  if (activeRun.status === "requires_action") {
+    throw new Error(
+      "Assistant is waiting for a tool action. Update the configured assistant tools or start a new conversation.",
+    );
+  }
+
+  await client.beta.threads.runs.poll(
+    activeRun.id,
+    { thread_id: threadId },
+    { pollIntervalMs: 1000 },
+  );
+}
+
+async function runAssistantReply(
   conversationId: string,
   messages: ChatMessage[],
 ) {
@@ -124,6 +157,8 @@ export async function generateAssistantReply(
       ? newUserMessages
       : [userMessages[userMessages.length - 1]];
 
+  await waitForThreadToBeIdle(client, existingState.threadId);
+
   for (const message of messagesToAppend) {
     await client.beta.threads.messages.create(existingState.threadId, {
       role: "user",
@@ -140,4 +175,24 @@ export async function generateAssistantReply(
   );
 
   return readRunReply(client, existingState.threadId, run.id);
+}
+
+export async function generateAssistantReply(
+  conversationId: string,
+  messages: ChatMessage[],
+) {
+  const previousTask = conversationQueues.get(conversationId) ?? Promise.resolve("");
+  const nextTask = previousTask
+    .catch(() => "")
+    .then(() => runAssistantReply(conversationId, messages));
+
+  conversationQueues.set(conversationId, nextTask);
+
+  try {
+    return await nextTask;
+  } finally {
+    if (conversationQueues.get(conversationId) === nextTask) {
+      conversationQueues.delete(conversationId);
+    }
+  }
 }
