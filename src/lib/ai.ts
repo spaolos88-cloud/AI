@@ -5,7 +5,7 @@ import {
   requireOpenAiKey,
 } from "@/lib/env";
 import { listKnowledgeFiles } from "@/lib/google-drive";
-import type { ChatMessage } from "@/lib/types";
+import type { ChatAttachment, ChatMessage } from "@/lib/types";
 
 const systemInstructions = [
   "You are Assistant Chat SA-A01.",
@@ -16,11 +16,63 @@ const systemInstructions = [
   "Do not claim to have read Google Drive files unless file context is explicitly provided in this request.",
 ].join("\n");
 
+function toFileData(dataUrl: string) {
+  const [, base64Data = ""] = dataUrl.split(",", 2);
+  return base64Data;
+}
+
+function toAttachmentInput(attachment: ChatAttachment) {
+  if (attachment.kind === "image") {
+    return {
+      type: "input_image" as const,
+      image_url: attachment.dataUrl,
+      detail: "auto" as const,
+    };
+  }
+
+  return {
+    type: "input_file" as const,
+    filename: attachment.name,
+    file_data: toFileData(attachment.dataUrl),
+  };
+}
+
 function toResponseInput(messages: ChatMessage[]) {
-  return messages.map((message) => ({
-    role: message.role,
-    content: message.content,
-  }));
+  return messages.map((message) => {
+    const attachments = message.attachments ?? [];
+
+    if (attachments.length === 0) {
+      return {
+        role: message.role,
+        content: message.content,
+      };
+    }
+
+    const content = [];
+
+    if (message.content.trim().length > 0) {
+      content.push({
+        type: "input_text" as const,
+        text: message.content,
+      });
+    }
+
+    for (const attachment of attachments) {
+      content.push(toAttachmentInput(attachment));
+    }
+
+    if (content.length === 0) {
+      content.push({
+        type: "input_text" as const,
+        text: "Use the uploaded attachment as context for this turn.",
+      });
+    }
+
+    return {
+      role: message.role,
+      content,
+    };
+  });
 }
 
 function getCandidateModels(preferredModel?: string) {
