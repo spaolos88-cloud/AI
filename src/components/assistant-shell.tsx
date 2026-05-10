@@ -50,6 +50,60 @@ function getAttachmentKind(file: File): ChatAttachment["kind"] {
   return "file";
 }
 
+function estimateDataUrlBytes(dataUrl: string) {
+  const [, base64Data = ""] = dataUrl.split(",", 2);
+  const paddingMatch = base64Data.match(/=+$/);
+  const padding = paddingMatch ? paddingMatch[0].length : 0;
+  return Math.max(0, Math.floor((base64Data.length * 3) / 4) - padding);
+}
+
+async function extractVideoFrameAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.muted = true;
+    video.playsInline = true;
+
+    const cleanup = () => {
+      URL.revokeObjectURL(objectUrl);
+      video.src = "";
+    };
+
+    video.onerror = () => {
+      cleanup();
+      reject(new Error(`Hindi ma-process ang video na "${file.name}".`));
+    };
+
+    video.onloadeddata = () => {
+      try {
+        const width = video.videoWidth || 640;
+        const height = video.videoHeight || 360;
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+
+        if (!ctx) {
+          cleanup();
+          reject(new Error("Hindi ma-read ang video frame."));
+          return;
+        }
+
+        ctx.drawImage(video, 0, 0, width, height);
+        const frameDataUrl = canvas.toDataURL("image/jpeg", 0.85);
+        cleanup();
+        resolve(frameDataUrl);
+      } catch {
+        cleanup();
+        reject(new Error(`Hindi ma-extract ang frame sa "${file.name}".`));
+      }
+    };
+
+    video.src = objectUrl;
+  });
+}
+
 function readFileAsDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -69,6 +123,19 @@ function readFileAsDataUrl(file: File) {
 }
 
 async function toChatAttachment(file: File): Promise<ChatAttachment> {
+  if (file.type.startsWith("video/")) {
+    const frameDataUrl = await extractVideoFrameAsDataUrl(file);
+
+    return {
+      id: createId(),
+      name: file.name,
+      mimeType: "image/jpeg",
+      kind: "video",
+      sizeBytes: estimateDataUrlBytes(frameDataUrl),
+      dataUrl: frameDataUrl,
+    };
+  }
+
   return {
     id: createId(),
     name: file.name,
@@ -77,6 +144,10 @@ async function toChatAttachment(file: File): Promise<ChatAttachment> {
     sizeBytes: file.size,
     dataUrl: await readFileAsDataUrl(file),
   };
+}
+
+function hasImagePreview(attachment: ChatAttachment) {
+  return attachment.dataUrl.startsWith("data:image/");
 }
 
 function formatBytes(sizeBytes: number) {
@@ -485,7 +556,7 @@ export function AssistantShell({
                                   : "border-[#e7e0d4] bg-[#faf8f3]"
                               }`}
                             >
-                              {attachment.kind === "image" ? (
+                              {hasImagePreview(attachment) ? (
                                 <Image
                                   src={attachment.dataUrl}
                                   alt={attachment.name}
@@ -560,7 +631,7 @@ export function AssistantShell({
                         key={attachment.id}
                         className="rounded-lg border border-[#e5dfd3] bg-[#faf8f3] p-2"
                       >
-                        {attachment.kind === "image" ? (
+                        {hasImagePreview(attachment) ? (
                           <Image
                             src={attachment.dataUrl}
                             alt={attachment.name}
@@ -626,6 +697,9 @@ export function AssistantShell({
                     <p className="text-[11px] text-[#8d867b]">
                       Upload images, short videos, PDFs, or office files. Keep each
                       file under {formatBytes(MAX_ATTACHMENT_SIZE_BYTES)}.
+                    </p>
+                    <p className="text-[11px] text-[#8d867b]">
+                      Video uploads are converted to a preview frame for analysis.
                     </p>
                   </div>
                   <div className="flex items-center gap-2">

@@ -17,7 +17,7 @@ const systemInstructions = [
 ].join("\n");
 
 function toAttachmentInput(attachment: ChatAttachment) {
-  if (attachment.kind === "image") {
+  if (attachment.kind === "image" || attachment.dataUrl.startsWith("data:image/")) {
     return {
       type: "input_image" as const,
       image_url: attachment.dataUrl,
