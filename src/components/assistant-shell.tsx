@@ -17,7 +17,7 @@ import type { ChatMessage, ChatResponse, StorageStatus } from "@/lib/types";
 const starterPrompts = [
   "Gumawa ng lead capture plan para sa service business.",
   "Ayusin ang workflow ng booking, CRM, at follow-up.",
-  "I-summarize ang laman ng knowledge base kapag nakakonekta na ang Google Drive.",
+  "Ano ang pinakamagandang paraan para matuto ng JavaScript?",
 ];
 
 function createId() {
@@ -40,7 +40,7 @@ export function AssistantShell() {
       id: createId(),
       role: "assistant",
       content:
-        "Assistant Chat SA-A01 ready. Sabihin mo kung website, CRM, automation, dashboard, o business system ang gusto mong buuin.",
+        "Assistant Chat SA-A01 ready. Puwede mo akong tanungin tungkol sa kahit ano.",
       createdAt: new Date().toISOString(),
     },
   ]);
@@ -137,7 +137,7 @@ export function AssistantShell() {
         id: createId(),
         role: "assistant",
         content:
-          "New chat started. Ano ang business goal na gusto mong unahin natin?",
+          "New chat started. Puwede kang magtanong tungkol sa kahit ano.",
         createdAt: new Date().toISOString(),
       },
     ]);
@@ -211,7 +211,7 @@ export function AssistantShell() {
                   Assistant Chat SA-A01
                 </h1>
                 <p className="text-xs text-[#706b62]">
-                  Private AI workspace with Google Drive storage boundary
+                  Private AI workspace for general chat and Google Drive storage
                 </p>
               </div>
             </div>
