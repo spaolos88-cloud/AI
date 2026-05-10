@@ -16,11 +16,6 @@ const systemInstructions = [
   "Do not claim to have read Google Drive files unless file context is explicitly provided in this request.",
 ].join("\n");
 
-function toFileData(dataUrl: string) {
-  const [, base64Data = ""] = dataUrl.split(",", 2);
-  return base64Data;
-}
-
 function toAttachmentInput(attachment: ChatAttachment) {
   if (attachment.kind === "image") {
     return {
@@ -33,7 +28,7 @@ function toAttachmentInput(attachment: ChatAttachment) {
   return {
     type: "input_file" as const,
     filename: attachment.name,
-    file_data: toFileData(attachment.dataUrl),
+    file_data: attachment.dataUrl,
   };
 }
 
