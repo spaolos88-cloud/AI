@@ -10,6 +10,7 @@ export type ChatMessage = {
 export type ChatRequest = {
   conversationId: string;
   messages: ChatMessage[];
+  model?: string;
 };
 
 export type StorageStatus = {
@@ -20,5 +21,6 @@ export type StorageStatus = {
 
 export type ChatResponse = {
   message: ChatMessage;
+  modelUsed: string;
   storage: StorageStatus;
 };

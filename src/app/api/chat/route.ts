@@ -36,7 +36,8 @@ export async function POST(request: Request) {
     if (
       typeof body.conversationId !== "string" ||
       !Array.isArray(body.messages) ||
-      !body.messages.every(isValidMessage)
+      !body.messages.every(isValidMessage) ||
+      (body.model !== undefined && typeof body.model !== "string")
     ) {
       return Response.json(
         { error: "Invalid chat request payload." },
@@ -47,8 +48,9 @@ export async function POST(request: Request) {
     const reply = await generateAssistantReply(
       body.conversationId,
       body.messages,
+      body.model,
     );
-    const assistantMessage = createMessage(reply);
+    const assistantMessage = createMessage(reply.text);
     const fullConversation = [...body.messages, assistantMessage];
 
     const storage = await putJsonToGoogleDrive(
@@ -62,6 +64,7 @@ export async function POST(request: Request) {
 
     const payload: ChatResponse = {
       message: assistantMessage,
+      modelUsed: reply.modelUsed,
       storage,
     };
 

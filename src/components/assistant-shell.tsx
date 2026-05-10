@@ -33,7 +33,15 @@ function createUserMessage(content: string): ChatMessage {
   };
 }
 
-export function AssistantShell() {
+type AssistantShellProps = {
+  availableModels: string[];
+  defaultModel: string;
+};
+
+export function AssistantShell({
+  availableModels,
+  defaultModel,
+}: AssistantShellProps) {
   const [conversationId, setConversationId] = useState(() => createId());
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -46,6 +54,8 @@ export function AssistantShell() {
   ]);
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [selectedModel, setSelectedModel] = useState(defaultModel);
+  const [activeModel, setActiveModel] = useState(defaultModel);
   const [storage, setStorage] = useState<StorageStatus>({
     enabled: false,
     saved: false,
@@ -95,6 +105,7 @@ export function AssistantShell() {
         body: JSON.stringify({
           conversationId,
           messages: nextMessages,
+          model: selectedModel,
         }),
       });
 
@@ -105,6 +116,7 @@ export function AssistantShell() {
       }
 
       setMessages((current) => [...current, payload.message]);
+      setActiveModel(payload.modelUsed);
       setStorage(payload.storage);
     } catch (error) {
       const errorMessage =
@@ -217,6 +229,20 @@ export function AssistantShell() {
             </div>
 
             <div className="flex items-center gap-2">
+              <label className="flex items-center gap-2 rounded-md border border-[#d8d2c6] bg-white px-2 py-1.5 text-xs text-[#3f3b35]">
+                <span className="text-[#706b62]">Model</span>
+                <select
+                  value={selectedModel}
+                  onChange={(event) => setSelectedModel(event.target.value)}
+                  className="bg-transparent text-xs outline-none"
+                >
+                  {availableModels.map((model) => (
+                    <option key={model} value={model}>
+                      {model}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <div className="flex items-center gap-2 rounded-md border border-[#d8d2c6] bg-white px-3 py-2 text-xs text-[#3f3b35]">
                 {isSending ? (
                   <Loader2 className="animate-spin" size={14} />
@@ -224,6 +250,7 @@ export function AssistantShell() {
                   <Cloud size={14} />
                 )}
                 <span>{statusLabel}</span>
+                <span className="text-[#8a847b]">· {activeModel}</span>
               </div>
               <button
                 type="button"
